@@ -11,47 +11,67 @@ class Clipyronment extends StatefulWidget {
   State<Clipyronment> createState() => _Clipyronmentstate();
 }
 
-class _Clipyronmentstate extends State<Clipyronment> {
+class _Clipyronmentstate extends State<Clipyronment> with SingleTickerProviderStateMixin {
   String copiedText = "INITIALIZING...";
   bool isLoading = false;
   Timer? _timer;
+  bool _isSyncing = false;
+  int _syncCount = 0;
+  late AnimationController _flickerController;
 
   Future<void> getClipboardText({bool silent = false}) async {
+    if (!mounted) return;
+
     if (!silent) {
       setState(() {
         isLoading = true;
         copiedText = "INTERCEPTING DATA...";
       });
+    } else {
+      setState(() {
+        _isSyncing = true;
+      });
     }
     
     try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final url = "http://${widget.ipAddress}:5000/clipboard?cb=$timestamp";
+
       final response = await http.get(
-        Uri.parse("http://${widget.ipAddress}:5000/clipboard"),
-      ).timeout(const Duration(seconds: 5));
+        Uri.parse(url),
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0",
+        },
+      ).timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         String newText = data["text"] ?? "EMPTY_BUFFER";
-        if (mounted && copiedText != newText) {
+        
+        if (mounted) {
           setState(() {
             copiedText = newText;
+            if (silent) _syncCount++;
           });
         }
-      } else if (!silent) {
+      } else if (!silent && mounted) {
         setState(() {
           copiedText = "ERROR: STATUS_${response.statusCode}";
         });
       }
     } catch (e) {
-      if (!silent) {
+      if (!silent && mounted) {
         setState(() {
           copiedText = "CONNECTION_REFUSED: UNREACHABLE_HOST";
         });
       }
     } finally {
-      if (mounted && !silent) {
+      if (mounted) {
         setState(() {
-          isLoading = false;
+          if (!silent) isLoading = false;
+          _isSyncing = false;
         });
       }
     }
@@ -60,8 +80,12 @@ class _Clipyronmentstate extends State<Clipyronment> {
   @override
   void initState() {
     super.initState();
+    _flickerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    )..repeat(reverse: true);
+    
     getClipboardText();
-    // Set up a timer to refresh every 1 second
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       getClipboardText(silent: true);
     });
@@ -69,7 +93,8 @@ class _Clipyronmentstate extends State<Clipyronment> {
 
   @override
   void dispose() {
-    _timer?.cancel(); // Important: Stop the timer when the page is closed
+    _timer?.cancel();
+    _flickerController.dispose();
     super.dispose();
   }
 
@@ -83,7 +108,7 @@ class _Clipyronmentstate extends State<Clipyronment> {
         backgroundColor: Colors.black,
         iconTheme: const IconThemeData(color: hackerGreen),
         title: const Text(
-          "CLIP_INTERCEPTOR",
+          "CLIPYRONMENT",
           style: TextStyle(
             color: hackerGreen,
             fontFamily: 'monospace',
@@ -92,6 +117,17 @@ class _Clipyronmentstate extends State<Clipyronment> {
           ),
         ),
         centerTitle: true,
+        actions: [
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 15.0),
+              child: Text(
+                "ID:$_syncCount", 
+                style: const TextStyle(color: hackerGreen, fontSize: 10, fontFamily: 'monospace'),
+              ),
+            ),
+          )
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1.0),
           child: Container(color: hackerGreen, height: 1.0),
@@ -102,10 +138,11 @@ class _Clipyronmentstate extends State<Clipyronment> {
           Opacity(
             opacity: 0.2,
             child: Image.asset(
-              'Images/img.png', // Changed back to img.png to match your previous setup
+              'Images/img_1.png',
               fit: BoxFit.cover,
               width: double.infinity,
               height: double.infinity,
+              errorBuilder: (context, error, stackTrace) => Container(color: Colors.black),
             ),
           ),
           
@@ -127,17 +164,29 @@ class _Clipyronmentstate extends State<Clipyronment> {
                       ),
                     ),
                     const Spacer(),
-                    const Text(
-                      "LIVE_FEED",
-                      style: TextStyle(
-                        color: hackerGreen,
-                        fontFamily: 'monospace',
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                    FadeTransition(
+                      opacity: _isSyncing ? _flickerController : const AlwaysStoppedAnimation(1.0),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _isSyncing ? "SYNCING..." : "LIVE_FEED",
+                            style: TextStyle(
+                              color: _isSyncing ? Colors.white : hackerGreen,
+                              fontFamily: 'monospace',
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.circle, 
+                            color: _isSyncing ? hackerGreen : Colors.red, 
+                            size: 10
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.circle, color: Colors.red, size: 8),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -194,7 +243,7 @@ class _Clipyronmentstate extends State<Clipyronment> {
                           child: CircularProgressIndicator(color: hackerGreen, strokeWidth: 2)
                         )
                       : const Text(
-                          "SCAN_CLIPBOARD",
+                          "FORCE_SCAN",
                           style: TextStyle(
                             color: hackerGreen,
                             fontFamily: 'monospace',
