@@ -1,4 +1,4 @@
-import 'package:clipyronment/Clipyronment.dart';
+import 'package:clipyronment/ip_config_page.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -13,7 +13,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: "Clipyronment",
-      home: Clipyronment(),
+      home: const IPConfigPage(),
     );
   }
 }
