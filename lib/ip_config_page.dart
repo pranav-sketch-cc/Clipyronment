@@ -1,4 +1,4 @@
-import 'package:clipyronment/Clipyronment.dart';
+import 'package:clipyronment/mode_selection_page.dart';
 import 'package:flutter/material.dart';
 
 class IPConfigPage extends StatefulWidget {
@@ -102,7 +102,7 @@ class _IPConfigPageState extends State<IPConfigPage> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => Clipyronment(
+                              builder: (context) => ModeSelectionPage(
                                 ipAddress: _ipController.text,
                               ),
                             ),
